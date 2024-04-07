@@ -1,0 +1,4 @@
+FROM hub.docker.com/openjdk:21
+EXPOSE 8080
+COPY target/*.jar /run/app.jar
+ENTRYPOINT ["java" ,"-jar","/run/app.jar"]
