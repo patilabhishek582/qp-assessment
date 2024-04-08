@@ -1,4 +1,4 @@
-package com.questionpro.testassignment;
+package com.questionpro.testassignment.config;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.context.annotation.Bean;
