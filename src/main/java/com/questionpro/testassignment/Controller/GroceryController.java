@@ -1,11 +1,10 @@
 package com.questionpro.testassignment.Controller;
 
-import com.questionpro.testassignment.Model.AuthRequest;
-import com.questionpro.testassignment.Model.GroceryDTO;
-import com.questionpro.testassignment.Model.OrderDTO;
-import com.questionpro.testassignment.Model.OrderResponse;
+import com.questionpro.testassignment.Entities.RefreshToken;
+import com.questionpro.testassignment.Model.*;
 import com.questionpro.testassignment.Service.GroceryService;
 import com.questionpro.testassignment.Service.JwtService;
+import com.questionpro.testassignment.Service.RefreshTokenService;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +29,9 @@ public class GroceryController {
 
     @Autowired
     private JwtService jwtService;
+
+    @Autowired
+    RefreshTokenService refreshTokenService;
 
     @Autowired
     AuthenticationManager authenticationManager;
@@ -76,15 +78,33 @@ public class GroceryController {
     }
 
     @PostMapping("/login")
-    public String login(@RequestBody AuthRequest authRequest) {
+    public JwtResponse login(@RequestBody AuthRequest authRequest) {
         logger.info("received login request : {}", authRequest.getUsername());
         Authentication authenticate = authenticationManager
                 .authenticate(new UsernamePasswordAuthenticationToken
                         (authRequest.getUsername(), authRequest.getPassword()));
-        if (authenticate.isAuthenticated())
-            return jwtService.generateToken(authRequest.getUsername());
-        else {
+        if (authenticate.isAuthenticated()) {
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(authRequest.getUsername());
+            return JwtResponse.builder()
+                    .accessToken(jwtService.generateToken(authRequest.getUsername()))
+                    .token(refreshToken.getToken())
+                    .build();
+        } else {
             throw new UsernameNotFoundException("User not found in db");
         }
+    }
+
+    @PostMapping("/refreshToken")
+    public JwtResponse refreshToken(@RequestBody RefreshTokenRequest refreshTokenRequest) {
+        return refreshTokenService.findByToken(refreshTokenRequest.getToken())
+                .map(refreshTokenService::verifyExpiration)
+                .map(RefreshToken::getUserInfo)
+                .map(userInfo -> {
+                    String accessToken = jwtService.generateToken(userInfo.getName());
+                    return JwtResponse.builder()
+                            .accessToken(accessToken)
+                            .token(refreshTokenRequest.getToken())
+                            .build();
+                }).orElseThrow(() -> new RuntimeException("Invalid refresh token"));
     }
 }
